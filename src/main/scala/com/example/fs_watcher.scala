@@ -2,6 +2,9 @@ package com.example
 
 import akka.actor.ActorSystem
 import com.beachape.filemanagement.{MonitorActor, RxMonitor}
+import com.beachape.filemanagement.RegistryTypes._
+import com.beachape.filemanagement.Messages._
+
 
 import java.nio.file.Paths
 import java.nio.file.StandardWatchEventKinds._
@@ -25,7 +28,19 @@ object sch_fs_watcher {
 
     val flowcells = Paths get "/Users/romanvg/Desktop/flowcell"
 
-    monitor.registerPath(ENTRY_MODIFY, flowcells)
+    //monitor.registerPath(ENTRY_MODIFY, flowcells)
+
+
+    // Akka actor approach
+
+    val modifyCallbackDirectory: Callback = { path => println(s"Something was modified in a directory: $path")}
+
+    fileMonitorActor ! RegisterCallback(
+      ENTRY_MODIFY,
+      None,
+      recursive = true,
+      path = flowcells,
+      modifyCallbackDirectory)
 
     //monitor.stop()
   }
