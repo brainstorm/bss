@@ -13,7 +13,6 @@ libraryDependencies ++= {
     "org.slf4j"                     % "slf4j-api"       % "1.7.14",
     "org.slf4j"                     % "slf4j-simple"    % "1.7.14",
     "com.typesafe.akka"            %% "akka-actor"      % akkaVersion,
-    "com.beachape.filemanagement"  %% "schwatcher"      % "0.3.0",
 
     "com.typesafe.akka"            %% "akka-testkit"    % akkaVersion    % "test",
     "org.scalatest"                %% "scalatest"       % "2.2.6"        % "test"
@@ -22,6 +21,15 @@ libraryDependencies ++= {
 
 fork in run := true
 
-mainClass in (Compile, run) := Some("bss.Application")
+//mainClass in Compile := Some("tools.Watch")
+mainClass in Compile := Some("bss.Application")
 
 scalariformSettings
+
+enablePlugins(JavaAppPackaging)
+
+enablePlugins(DockerPlugin)
+
+dockerExposedVolumes in Docker := Seq(
+  "/opt/docker"
+)

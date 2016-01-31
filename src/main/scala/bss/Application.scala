@@ -1,20 +1,22 @@
 package bss
 
 import java.nio.file.Paths
-import java.nio.file.StandardWatchEventKinds._
 
 import akka.actor.ActorSystem
-import com.beachape.filemanagement.Messages.RegisterCallback
-import com.beachape.filemanagement.MonitorActor
 import com.typesafe.config.ConfigFactory
-//import org.slf4j.LoggerFactory
 
 import scala.concurrent.Await
-import scala.concurrent.duration.{ Duration, DurationDouble, DurationInt }
+import scala.concurrent.duration.Duration
 
 object Application extends App {
 
-  //val logger = LoggerFactory.getLogger(this.getClass)
+  if (args.size != 1) {
+    println("Usage: Application <path>")
+    sys.exit(-1)
+  }
+
+  val rootPath = Paths.get(args(0)).toAbsolutePath
+  //val rootPath = Paths.get(bssConfig.getString("root-path"))
 
   val config = ConfigFactory.load()
 
@@ -22,23 +24,11 @@ object Application extends App {
 
   implicit val system = ActorSystem("Bss", config)
 
-  val monitorConcurrency = bssConfig.getInt("monitor-concurrency")
-
-  val fileMonitorActor = system.actorOf(MonitorActor(
-    dedupeTime = 1 second,
-    concurrency = monitorConcurrency
-  ))
-
-  val rootPath = Paths.get(bssConfig.getString("root-path"))
-
   println(s"Watching for ${rootPath.toAbsolutePath}")
 
-  fileMonitorActor ! RegisterCallback(
-    ENTRY_CREATE,
-    path = rootPath,
-    recursive = true,
-    callback = { path => println(s"==> $path") }
-  )
+  val router = system.actorOf(EventsRouter.props(rootPath), "EvtRouter")
+
+  system.actorOf(RecursiveWatcher.props(rootPath, router), "RecWatcher")
 
   Await.result(system.whenTerminated, Duration.Inf)
 }
