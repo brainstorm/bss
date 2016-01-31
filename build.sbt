@@ -1,13 +1,35 @@
 name := """bss"""
 
-version := "1.0"
+organization := "com.github.brainstorm"
+
+version := "0.1"
 
 scalaVersion := "2.11.7"
 
-// Change this to another test framework if you prefer
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test"
-libraryDependencies += "com.beachape.filemanagement" %% "schwatcher" % "0.2.0"
+libraryDependencies ++= {
+  val akkaVersion = "2.4.1"
 
-// Uncomment to use Akka
-libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.11"
+  Seq(
+    "org.slf4j"                     % "slf4j-api"       % "1.7.14",
+    "org.slf4j"                     % "slf4j-simple"    % "1.7.14",
+    "com.typesafe.akka"            %% "akka-actor"      % akkaVersion,
 
+    "com.typesafe.akka"            %% "akka-testkit"    % akkaVersion    % "test",
+    "org.scalatest"                %% "scalatest"       % "2.2.6"        % "test"
+  )
+}
+
+fork in run := true
+
+//mainClass in Compile := Some("tools.Watch")
+mainClass in Compile := Some("bss.Application")
+
+scalariformSettings
+
+enablePlugins(JavaAppPackaging)
+
+enablePlugins(DockerPlugin)
+
+dockerExposedVolumes in Docker := Seq(
+  "/opt/docker"
+)
