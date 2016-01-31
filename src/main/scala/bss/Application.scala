@@ -28,7 +28,7 @@ object Application extends App {
 
   val router = system.actorOf(EventsRouter.props(rootPath), "EvtRouter")
 
-  system.actorOf(RecursiveWatcher.props(rootPath, router), "RecWatcher")
+  system.actorOf(RecursiveWatcher.props(rootPath, router, dbBasePath = Some(Paths.get("dbs/watcher"))), "RecWatcher")
 
   Await.result(system.whenTerminated, Duration.Inf)
 }

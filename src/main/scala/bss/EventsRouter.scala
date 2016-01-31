@@ -12,7 +12,8 @@ object EventsRouter {
 class EventsRouter(rootPath: Path) extends Actor with ActorLogging {
 
   def receive = {
-    case PathEvent(path, eventType, count) =>
-      log.info(s">>> $eventType ($count) : $path")
+    case PathEvent(eventType, path, isDirectory, count) =>
+      val relPath = rootPath.relativize(path)
+      log.info(s">>> $eventType ($count) : $relPath")
   }
 }
