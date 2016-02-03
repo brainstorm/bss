@@ -21,6 +21,9 @@
     The file contents are based on /dev/urandom for now, matching the filesize in the first column of the
     TSV file.
 
+    I.e:
+        /flowcell_writes_replay.py -f virtual_fc -s flowcell_filesizes_bcls.tsv.gz -r 1000
+
     NOTE: The resulting directory/file structure can easily fill up your storage.
 """
 import pandas as pd
@@ -30,7 +33,7 @@ import click
 import logging
 
 log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
@@ -52,7 +55,11 @@ ILLUMINA_FILESIZES='flowcell_filesizes.tsv.gz'
               default=ILLUMINA_FILESIZES,
               help="Filesizes and timeseries of illumina basecalls created over time."
 )
-def main(flowcell, sizesfile):
+@click.option('-r', '--restart_at',
+              default=0,
+              help="Where to restart from the timeseries (manual checkpointing)."
+)
+def main(flowcell, sizesfile, restart_at):
     # y[0:15] is clipping the last 3 digits of the microseconds since
     # https://docs.python.org/2/library/datetime.html#strftime-strptime-behavior
     # states that: "the %f directive accepts from one to six digits and zero pads
