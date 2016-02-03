@@ -25,6 +25,7 @@ fork in run := true
 
 //mainClass in Compile := Some("tools.Watch")
 mainClass in Compile := Some("bss.Application")
+//mainClass in Compile := Some("tools.Snapshot")
 
 scalariformSettings
 

@@ -1,20 +1,14 @@
 package bss
 
-import java.io.IOException
-import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
-import java.nio.file._
 import java.nio.file.StandardWatchEventKinds._
+import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
-
 import java.security.MessageDigest
 
+import akka.actor.{ Actor, ActorLogging, ActorRef, Props }
 import bss.WatcherEvents._
-import org.rocksdb.{ FlushOptions, Options, RocksDB }
 
-import collection.JavaConverters._
-import akka.actor.{ ActorRef, Props, ActorLogging, Actor }
-
+import scala.collection.JavaConverters._
 import scala.concurrent.duration.{ DurationDouble, FiniteDuration }
 import scala.util.{ Failure, Success, Try }
 
@@ -73,16 +67,29 @@ class RecursiveWatcher(
   private[this] val kinds = events.map(_.kind)
 
   private[this] var watcher: WatchService = _
-  private[this] var db: RocksDB = _
+  private[this] var db: WatcherDb = _
 
   override def preStart() = {
     // Initialize the watch service
-    watcher = FileSystems.getDefault.newWatchService()
-    rootPath.register(watcher, kinds: _*)
+    log.info("Creating the watch service ...")
+    Try(FileSystems.getDefault.newWatchService()) match {
+      case Success(value) =>
+        watcher = value
+        Try(rootPath.register(watcher, kinds: _*)) match {
+          case Failure(exception) =>
+            log.error(s"Exception while registering for '$rootPath': $exception")
+            context.system.terminate()
+          case _ =>
+        }
+
+      case Failure(exception) =>
+        log.error(s"Exception while creating the watch service for '$rootPath': $exception")
+        context.system.terminate()
+    }
 
     // Initialize the database
-    val options = new Options().setCreateIfMissing(true)
-    Try(RocksDB.open(options, dbBasePath.toString)) match {
+    log.info(s"Opening RocksDB at $dbBasePath ...")
+    Try(WatcherDb(rootPath, dbBasePath)) match {
       case Success(value) =>
         db = value
         self ! Poll
@@ -90,6 +97,22 @@ class RecursiveWatcher(
       case Failure(exception) =>
         log.error(s"Exception while opening the database at '$dbBasePath': $exception")
         context.system.terminate()
+    }
+  }
+
+  override def postStop() = {
+    log.info("Closing the watch service ...")
+    Try(watcher.close()) match {
+      case Failure(exception) if !exception.isInstanceOf[NullPointerException] =>
+        log.error(s"Exception while closing the watcher service: $exception")
+      case _ =>
+    }
+
+    log.info("Closing RocksDB ...")
+    Try(db.close()) match {
+      case Failure(exception) if !exception.isInstanceOf[NullPointerException] =>
+        log.error(s"Exception while closing RocksDB: $exception")
+      case _ =>
     }
   }
 
@@ -110,39 +133,9 @@ class RecursiveWatcher(
   }
 
   def recover() = {
-    def walkPath(path: Path, attrs: BasicFileAttributes, register: Boolean = false): FileVisitResult = {
-      require(path != null)
-      require(attrs != null)
-
-      if (path != rootPath) {
-        if (register)
-          path.register(watcher, kinds: _*)
-
-        dbCheckRecover(db, path, attrs)
-      }
-
-      FileVisitResult.CONTINUE
+    db.recover(watcher, events) { (eventType, path, isDirectory) =>
+      notifyPathEvent(eventType, path, isDirectory)
     }
-
-    try {
-      Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
-        override def preVisitDirectory(path: Path, attrs: BasicFileAttributes): FileVisitResult =
-          walkPath(path, attrs, register = true)
-
-        override def visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult =
-          walkPath(path, attrs)
-
-        //override def postVisitDirectory(path: Path, exc: IOException): FileVisitResult = {
-        //  if (exc != null) throw exc
-        //  FileVisitResult.CONTINUE
-        //}
-      })
-    } catch {
-      case e: IOException =>
-        log.warning(s"Exception while traversing the paths for recovery: $e")
-    }
-
-    db.flush(new FlushOptions().setWaitForFlush(false))
   }
 
   def poll() = {
@@ -172,7 +165,7 @@ class RecursiveWatcher(
               log.debug(s"--> Registered $ctxRepr")
             }
 
-            dbUpdate(db, path, attrs)
+            db.update(path, attrs)
 
             notifyPathEvent(eventType, path, attrs.isDirectory, count)
 
@@ -190,41 +183,6 @@ class RecursiveWatcher(
       import scala.concurrent.ExecutionContext.Implicits.global
       context.system.scheduler.scheduleOnce(emptyPollInterval, self, Poll)
     }
-  }
-
-  def pathNameHash(path: Path): Array[Byte] = {
-    RecursiveWatcher.hash(path.toString.getBytes(StandardCharsets.UTF_8))
-  }
-
-  def pathAttrsHash(lastModifiedMillis: Long, size: Long): Array[Byte] = {
-    RecursiveWatcher.hash(
-      ByteBuffer.allocate(16)
-        .putLong(lastModifiedMillis)
-        .putLong(size)
-        .array()
-    )
-  }
-
-  def dbCheckRecover(db: RocksDB, path: Path, attrs: BasicFileAttributes): Unit = {
-    val pathKey = pathNameHash(path)
-    val attrsHash = pathAttrsHash(attrs.lastModifiedTime.toMillis, attrs.size)
-
-    Option(db.get(pathKey)) match {
-      case Some(prevAttrsHash) =>
-        if (!prevAttrsHash.sameElements(attrsHash)) {
-          notifyPathEvent(Modify, path, attrs.isDirectory)
-          db.put(pathKey, attrsHash)
-        }
-      case None =>
-        notifyPathEvent(Create, path, attrs.isDirectory)
-        db.put(pathKey, attrsHash)
-    }
-  }
-
-  def dbUpdate(db: RocksDB, path: Path, attrs: BasicFileAttributes) = {
-    val pathKey = pathNameHash(path)
-    val attrsHash = pathAttrsHash(attrs.lastModifiedTime.toMillis, attrs.size)
-    db.put(pathKey, attrsHash)
   }
 
   def notifyPathEvent(eventType: EventType, path: Path, isDirectory: Boolean, count: Int = 1) = {
