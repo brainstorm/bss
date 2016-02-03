@@ -29,6 +29,7 @@ import sys
 from time import sleep
 
 VIRTUAL_FLOWCELL_DIR='virtual_fc'
+ILLUMINA_FILESIZES='flowcell_filesizes.tsv.gz'
 
 # y[0:15] is clipping the last 3 digits of the microseconds since
 # https://docs.python.org/2/library/datetime.html#strftime-strptime-behavior
@@ -38,7 +39,7 @@ VIRTUAL_FLOWCELL_DIR='virtual_fc'
 dateparse = lambda x,y: pd.datetime.strptime(x+" "+y[0:15],'%Y-%m-%d %H:%M:%S.%f')
 
 print("Loading Illumina(tm) write activity timeseries... ")
-flowcell_writes = pd.read_table('flowcell_filesizes.tsv.gz', parse_dates={'datetime' : ["date", "time"]},
+flowcell_writes = pd.read_table(ILLUMINA_FILESIZES, ' parse_dates={'datetime' : ["date", "time"]},
                                 index_col='datetime', date_parser = dateparse, sep=' ',
                                 names=['size', 'filename', 'date', 'time', 'offset'])
 del flowcell_writes['offset']
