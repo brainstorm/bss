@@ -27,6 +27,16 @@ import pandas as pd
 import os
 import sys
 from time import sleep
+import logging
+
+log = logging.getLogger('flowcell_replay')
+log.setLevel(logging.DEBUG)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+
+log.addHandler(ch)
+
 
 VIRTUAL_FLOWCELL_DIR='virtual_fc'
 ILLUMINA_FILESIZES='flowcell_filesizes.tsv.gz'
@@ -38,8 +48,8 @@ ILLUMINA_FILESIZES='flowcell_filesizes.tsv.gz'
 
 dateparse = lambda x,y: pd.datetime.strptime(x+" "+y[0:15],'%Y-%m-%d %H:%M:%S.%f')
 
-print("Loading Illumina(tm) write activity timeseries... ")
-flowcell_writes = pd.read_table(ILLUMINA_FILESIZES, ' parse_dates={'datetime' : ["date", "time"]},
+log.info("Loading Illumina(tm) write activity timeseries... ")
+flowcell_writes = pd.read_table(ILLUMINA_FILESIZES, parse_dates={'datetime' : ["date", "time"]},
                                 index_col='datetime', date_parser = dateparse, sep=' ',
                                 names=['size', 'filename', 'date', 'time', 'offset'])
 del flowcell_writes['offset']
@@ -49,18 +59,17 @@ flowcell_writes.sort_index(ascending=True, inplace=True)
 flowcell_writes['deltas'] = flowcell_writes.index.difference(flowcell_writes).to_series().diff().fillna(0)
 
 only_bcl = flowcell_writes[flowcell_writes["filename"].str.contains(".bcl")]
-print("done.")
 
-print("Replaying write activity starts!")
+log.info("Replaying write activity starts!")
 # Iterate over the pandas dataframe, creating the directories and file objects.
 for event in only_bcl.values:
     size, filename, delta = event[0], event[1], event[2]
     delay = delta.total_seconds()
-    sys.stdout.write("Waiting for {delay} seconds to generate {bcl}... ".format(delay=delay, bcl=filename))
+    log.info("Waiting for {delay} seconds to generate {bcl}... ".format(delay=delay, bcl=filename))
     # Wait for the amount of seconds that the real machine takes to write the file(s)
     sleep(delay)
-    print("done.")
-    sys.stdout.write("Generating {bytes} bytes for {bcl}... ".format(bytes=size, bcl=filename))
+
+    log.info("Generating {bytes} bytes for {bcl}... ".format(bytes=size, bcl=filename))
 
     if not os.path.exists(os.path.join(VIRTUAL_FLOWCELL_DIR, os.path.dirname(filename))):
         try:
@@ -74,4 +83,3 @@ for event in only_bcl.values:
             # XXX: Approximate this better, need to finetune filesizes
             for bytes in xrange(size/100):
                 bcl.write(rnd.readline())
-    print("done.")
