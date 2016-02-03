@@ -24,11 +24,17 @@ object Application extends App {
 
   implicit val system = ActorSystem("Bss", config)
 
+  sys.addShutdownHook {
+    system.terminate()
+  }
+
   println(s"Watching for ${rootPath.toAbsolutePath}")
 
   val router = system.actorOf(EventsRouter.props(rootPath), "EvtRouter")
 
-  system.actorOf(RecursiveWatcher.props(rootPath, router), "RecWatcher")
+  val dbBasePath = Some(Paths.get(bssConfig.getString("watcher.db-path")))
+
+  system.actorOf(RecursiveWatcher.props(rootPath, router, dbBasePath = dbBasePath), "RecWatcher")
 
   Await.result(system.whenTerminated, Duration.Inf)
 }
