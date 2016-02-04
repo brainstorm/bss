@@ -21,56 +21,88 @@
     The file contents are based on /dev/urandom for now, matching the filesize in the first column of the
     TSV file.
 
+    I.e:
+        /flowcell_writes_replay.py -f virtual_fc -s flowcell_filesizes_bcls.tsv.gz -r 1000
+
     NOTE: The resulting directory/file structure can easily fill up your storage.
 """
 import pandas as pd
 import os
-import sys
 from time import sleep
+import click
+import logging
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+
+log.addHandler(ch)
 
 VIRTUAL_FLOWCELL_DIR='virtual_fc'
+ILLUMINA_FILESIZES='flowcell_filesizes.tsv.gz'
 
-# y[0:15] is clipping the last 3 digits of the microseconds since
-# https://docs.python.org/2/library/datetime.html#strftime-strptime-behavior
-# states that: "the %f directive accepts from one to six digits and zero pads
-# on the right... stat returned 9 digits instead of 6"
+@click.command()
+@click.option('-f', '--flowcell',
+              type=click.Path(),
+              default=VIRTUAL_FLOWCELL_DIR,
+              help="Flowcell directory structure and files will be created here."
+)
 
-dateparse = lambda x,y: pd.datetime.strptime(x+" "+y[0:15],'%Y-%m-%d %H:%M:%S.%f')
+@click.option('-s', '--sizesfile',
+              type=click.Path(exists=True),
+              default=ILLUMINA_FILESIZES,
+              help="Filesizes and timeseries of illumina basecalls created over time."
+)
+@click.option('-r', '--restart_at',
+              default=0,
+              help="Where to restart from the timeseries (manual checkpointing)."
+)
+def main(flowcell, sizesfile, restart_at):
+    # y[0:15] is clipping the last 3 digits of the microseconds since
+    # https://docs.python.org/2/library/datetime.html#strftime-strptime-behavior
+    # states that: "the %f directive accepts from one to six digits and zero pads
+    # on the right... stat returned 9 digits instead of 6"
 
-print("Loading Illumina(tm) write activity timeseries... ")
-flowcell_writes = pd.read_table('flowcell_filesizes.tsv.gz', parse_dates={'datetime' : ["date", "time"]},
-                                index_col='datetime', date_parser = dateparse, sep=' ',
-                                names=['size', 'filename', 'date', 'time', 'offset'])
-del flowcell_writes['offset']
+    dateparse = lambda x,y: pd.datetime.strptime(x+" "+y[0:15],'%Y-%m-%d %H:%M:%S.%f')
 
-# Order timeseries and calculate deltas between file creation
-flowcell_writes.sort_index(ascending=True, inplace=True)
-flowcell_writes['deltas'] = flowcell_writes.index.difference(flowcell_writes).to_series().diff().fillna(0)
+    log.info("Loading Illumina(tm) write activity timeseries... ")
+    flowcell_writes = pd.read_table(sizesfile, parse_dates={'datetime' : ["date", "time"]},
+                                    index_col='datetime', date_parser = dateparse, sep=' ',
+                                    names=['size', 'filename', 'date', 'time', 'offset'])
+    del flowcell_writes['offset']
 
-only_bcl = flowcell_writes[flowcell_writes["filename"].str.contains(".bcl")]
-print("done.")
+    # Order timeseries and calculate deltas between file creation
+    flowcell_writes.sort_index(ascending=True, inplace=True)
+    flowcell_writes['deltas'] = flowcell_writes.index.difference(flowcell_writes).to_series().diff().fillna(0)
 
-print("Replaying write activity starts!")
-# Iterate over the pandas dataframe, creating the directories and file objects.
-for event in only_bcl.values:
-    size, filename, delta = event[0], event[1], event[2]
-    delay = delta.total_seconds()
-    sys.stdout.write("Waiting for {delay} seconds to generate {bcl}... ".format(delay=delay, bcl=filename))
-    # Wait for the amount of seconds that the real machine takes to write the file(s)
-    sleep(delay)
-    print("done.")
-    sys.stdout.write("Generating {bytes} bytes for {bcl}... ".format(bytes=size, bcl=filename))
+    only_bcl = flowcell_writes[flowcell_writes["filename"].str.contains(".bcl")]
 
-    if not os.path.exists(os.path.join(VIRTUAL_FLOWCELL_DIR, os.path.dirname(filename))):
-        try:
-            os.makedirs(os.path.join(VIRTUAL_FLOWCELL_DIR, os.path.dirname(filename)))
-        except OSError as exc: # Guard against race condition
-            if exc.errno != errno.EEXIST:
-                raise
+    log.info("Replaying write activity starts!")
+    # Iterate over the pandas dataframe, creating the directories and file objects.
+    for event in only_bcl.values:
+        size, filename, delta = event[0], event[1], event[2]
+        delay = delta.total_seconds()
+        log.info("Waiting for {delay} seconds to generate {bcl}... ".format(delay=delay, bcl=filename))
+        # Wait for the amount of seconds that the real machine takes to write the file(s)
+        sleep(delay)
 
-    with open(os.path.join(VIRTUAL_FLOWCELL_DIR, filename), 'wb+') as bcl:
-        with open("/dev/urandom", "rb") as rnd:
-            # XXX: Approximate this better, need to finetune filesizes
-            for bytes in xrange(size/100):
-                bcl.write(rnd.readline())
-    print("done.")
+        log.info("Generating {bytes} bytes for {bcl}... ".format(bytes=size, bcl=filename))
+
+        if not os.path.exists(os.path.join(flowcell, os.path.dirname(filename))):
+            try:
+                os.makedirs(os.path.join(flowcell, os.path.dirname(filename)))
+            except OSError as exc: # Guard against race condition
+                if exc.errno != errno.EEXIST:
+                    raise
+
+        with open(os.path.join(flowcell, filename), 'wb+') as bcl:
+            with open("/dev/urandom", "rb") as rnd:
+                # XXX: Approximate this better, need to finetune filesizes
+                for bytes in xrange(size/100):
+                    bcl.write(rnd.readline())
+
+
+if __name__ == '__main__':
+    main()
