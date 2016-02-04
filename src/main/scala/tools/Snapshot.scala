@@ -2,7 +2,7 @@ package tools
 
 import java.nio.file._
 
-import bss.WatcherDb
+import bss.{ Watcher, WatcherDb }
 import com.typesafe.config.ConfigFactory
 
 object Snapshot extends App {
@@ -18,7 +18,8 @@ object Snapshot extends App {
 
   val dbBasePath = Paths.get(config.getString("bss.watcher.db-path"))
 
-  WatcherDb(rootPath, dbBasePath).snapshot { (eventType, path, isDirectory) =>
+  val db = WatcherDb(rootPath, dbBasePath)
+  Watcher(rootPath).snapshot(db) { (eventType, path, isDirectory) =>
     println(s"--> $eventType $path")
   }
 }
