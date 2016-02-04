@@ -1,8 +1,8 @@
-package tools
+package bss.tools
 
 import java.nio.file._
 
-import bss.{ Watcher, WatcherDb }
+import bss.watcher.{ Watcher, WatcherDb }
 import com.typesafe.config.ConfigFactory
 
 object Snapshot extends App {

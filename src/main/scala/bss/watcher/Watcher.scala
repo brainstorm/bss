@@ -1,12 +1,10 @@
-package bss
+package bss.watcher
 
 import java.nio.file.StandardWatchEventKinds._
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 
-import org.rocksdb.FlushOptions
-
-import bss.Watcher._
+import bss.watcher.Watcher._
 
 object Watcher {
 

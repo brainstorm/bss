@@ -15,6 +15,7 @@ libraryDependencies ++= {
     "org.slf4j"                     % "slf4j-simple"    % "1.7.14",
     "com.typesafe.akka"            %% "akka-actor"      % akkaVersion,
     "org.rocksdb"                   % "rocksdbjni"      % "4.1.0",
+    "com.github.scopt"             %% "scopt"           % "3.3.0",
 
     "com.typesafe.akka"            %% "akka-testkit"    % akkaVersion    % "test",
     "org.scalatest"                %% "scalatest"       % "2.2.6"        % "test"
@@ -23,9 +24,9 @@ libraryDependencies ++= {
 
 fork in run := true
 
-//mainClass in Compile := Some("tools.Watch")
-mainClass in Compile := Some("bss.Application")
-//mainClass in Compile := Some("tools.Snapshot")
+//mainClass in Compile := Some("bss.tools.Watch")
+mainClass in Compile := Some("bss.tools.Watch")
+//mainClass in Compile := Some("bss.tools.Snapshot")
 
 scalariformSettings
 

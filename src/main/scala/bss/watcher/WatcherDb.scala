@@ -1,4 +1,4 @@
-package bss
+package bss.watcher
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -6,8 +6,9 @@ import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 
-import bss.Watcher.{ EventType, NotifyPathCallback, Create, Modify }
 import org.rocksdb.{ FlushOptions, Options, RocksDB }
+
+import bss.watcher.Watcher.{ Create, Modify, NotifyPathCallback }
 
 object WatcherDb {
   def apply(watcherRootPath: Path, dbBasePath: Path) = new WatcherDb(watcherRootPath, dbBasePath)
@@ -16,6 +17,10 @@ object WatcherDb {
 class WatcherDb(watcherRootPath: Path, dbBasePath: Path) {
 
   private[this] val db: RocksDB = {
+    val dbParentFile = dbBasePath.toAbsolutePath.normalize.getParent.toFile
+    if (!dbParentFile.exists)
+      dbParentFile.mkdirs()
+
     val options = new Options().setCreateIfMissing(true)
     RocksDB.open(options, dbBasePath.toString)
   }
