@@ -6,7 +6,7 @@ import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 
-import bss.WatcherEvents.{ Create, Modify }
+import bss.Watcher.{ EventType, NotifyPathCallback, Create, Modify }
 import org.rocksdb.{ FlushOptions, Options, RocksDB }
 
 object WatcherDb {
@@ -39,9 +39,7 @@ class WatcherDb(watcherRootPath: Path, dbBasePath: Path) {
     db.put(pathKey, attrsHash)
   }
 
-  def checkRecover(path: Path, attrs: BasicFileAttributes)(
-    notifyPathEvent: (WatcherEvents.EventType, Path, Boolean) => Unit
-  ): Unit = {
+  def checkRecover(path: Path, attrs: BasicFileAttributes)(notifyPathEvent: NotifyPathCallback): Unit = {
 
     val pathKey = pathNameHash(watcherRootPath.relativize(path))
     val attrsHash = pathAttrsHash(attrs.lastModifiedTime.toMillis, attrs.size)
@@ -58,55 +56,8 @@ class WatcherDb(watcherRootPath: Path, dbBasePath: Path) {
     }
   }
 
-  def recover(watcher: WatchService, events: Seq[WatcherEvents.EventType])(
-    notifyPathEvent: (WatcherEvents.EventType, Path, Boolean) => Unit
-  ) = {
-
-    val kinds = events.map(_.kind)
-
-    def walkPath(path: Path, attrs: BasicFileAttributes, register: Boolean = false): FileVisitResult = {
-      require(path != null)
-      require(attrs != null)
-
-      if (path != watcherRootPath) {
-        if (register)
-          path.register(watcher, kinds: _*)
-
-        checkRecover(path, attrs)(notifyPathEvent)
-      }
-
-      FileVisitResult.CONTINUE
-    }
-
-    Files.walkFileTree(watcherRootPath, new SimpleFileVisitor[Path] {
-      override def preVisitDirectory(path: Path, attrs: BasicFileAttributes): FileVisitResult =
-        walkPath(path, attrs, register = true)
-
-      override def visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult =
-        walkPath(path, attrs)
-    })
-
-    db.flush(new FlushOptions().setWaitForFlush(false))
-  }
-
-  def snapshot(notifyPathEvent: (WatcherEvents.EventType, Path, Boolean) => Unit = { (_, _, _) => }) = {
-
-    def walkPath(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
-      require(path != null)
-      require(attrs != null)
-
-      if (path != watcherRootPath)
-        checkRecover(path, attrs)(notifyPathEvent)
-
-      FileVisitResult.CONTINUE
-    }
-
-    Files.walkFileTree(watcherRootPath, new SimpleFileVisitor[Path] {
-      override def preVisitDirectory(path: Path, attrs: BasicFileAttributes): FileVisitResult = walkPath(path, attrs)
-      override def visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult = walkPath(path, attrs)
-    })
-
-    db.flush(new FlushOptions().setWaitForFlush(false))
+  def flush(waitForFlush: Boolean = true) = {
+    db.flush(new FlushOptions().setWaitForFlush(waitForFlush))
   }
 
   def close() = {
