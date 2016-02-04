@@ -1,11 +1,11 @@
-package tools
+package bss.tools
 
 import java.nio.file.StandardWatchEventKinds.{ ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY }
 import java.nio.file._
 
 import scala.collection.JavaConverters._
 
-object Watch extends App {
+object SimpleWatch extends App {
 
   if (args.size != 1) {
     println("Usage: WatchTest <path>")

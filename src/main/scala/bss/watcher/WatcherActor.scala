@@ -1,16 +1,17 @@
-package bss
+package bss.watcher
 
 import java.nio.file._
 import java.security.MessageDigest
 
-import akka.actor.{ Actor, ActorLogging, ActorRef, Props }
-import bss.RecursiveWatcher.PathEvent
-import bss.Watcher._
-
 import scala.concurrent.duration.{ DurationDouble, FiniteDuration }
 import scala.util.{ Failure, Success, Try }
 
-object RecursiveWatcher {
+import akka.actor.{ Actor, ActorLogging, ActorRef, Props }
+
+import bss.watcher.Watcher.EventType
+import bss.watcher.WatcherActor.PathEvent
+
+object WatcherActor {
 
   case class PathEvent(eventType: EventType, path: Path, isDirectory: Boolean, count: Int = 1)
   case class OverflowEvent()
@@ -21,15 +22,15 @@ object RecursiveWatcher {
   def props(
     rootPath: Path,
     listener: ActorRef,
-    events: Seq[EventType] = AllEventTypes,
+    events: Seq[EventType] = Watcher.AllEventTypes,
     emptyPollInterval: FiniteDuration = 0.5 seconds,
     dbBasePath: Option[Path] = None
   ) =
-    Props(classOf[RecursiveWatcher], rootPath, listener, events, emptyPollInterval,
+    Props(classOf[WatcherActor], rootPath, listener, events, emptyPollInterval,
       dbBasePath.getOrElse(Paths.get(".").toAbsolutePath().normalize))
 }
 
-class RecursiveWatcher(
+class WatcherActor(
   rootPath: Path,
   listener: ActorRef,
   events: Seq[EventType],

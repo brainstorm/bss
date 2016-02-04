@@ -3,7 +3,8 @@ package bss
 import java.nio.file.Path
 
 import akka.actor.{ Props, ActorLogging, Actor }
-import bss.RecursiveWatcher.PathEvent
+import bss.watcher.WatcherActor
+import WatcherActor.PathEvent
 
 object EventsRouter {
   def props(rootPath: Path) = Props(classOf[EventsRouter], rootPath)
