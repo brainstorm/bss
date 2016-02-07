@@ -24,7 +24,17 @@ To run the image:
 docker run -ti --name bss --rm -v $(pwd)/virtual_fc:/mnt bss:0.1 /mnt
 ```
 
-To create an snapshot of the directory structure and timestamps/sizes:
+To create a watcher database snapshot of the directory structure and timestamps/sizes:
 ```
 sbt "run-main bss.tools.Snapshot tmp"
+```
+
+To generate a list of events from the stats:
+```
+python bin/flowcell_process_stats.py -o events.tsv flowcell_filesizes.tsv.gz
+```
+
+To simulate the events:
+```
+sbt "run-main bss.tools.Replay events.tsv tmp"
 ```
