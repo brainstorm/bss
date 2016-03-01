@@ -18,7 +18,9 @@ libraryDependencies ++= {
     "com.github.scopt"             %% "scopt"           % "3.3.0",
 
     "com.typesafe.akka"            %% "akka-testkit"    % akkaVersion    % "test",
-    "org.scalatest"                %% "scalatest"       % "2.2.6"        % "test"
+    "org.scalatest"                %% "scalatest"       % "2.2.6"        % "test",
+
+    "org.apache.kafka"             %% "kafka"           % "0.9.0.1"
   )
 }
 
