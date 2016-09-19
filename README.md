@@ -1,3 +1,5 @@
+DEPRECATED by Luca Pireddu in: http://biorxiv.org/content/early/2016/08/23/071092.
+
 # bss
 
 Files watcher for the Illumina sequencers that streams reads through Kafka.
