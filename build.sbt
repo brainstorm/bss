@@ -37,5 +37,6 @@ enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
 
 dockerExposedVolumes in Docker := Seq(
-  "/opt/docker"
+  "/opt/docker",
+	"."
 )
